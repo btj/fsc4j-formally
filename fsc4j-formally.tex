@@ -10,6 +10,7 @@
 \newcommand{\op}{\odot}
 \newcommand{\hstep}{\rightarrow_\mathsf{h}}
 \newtheorem{lemma}{Lemma}
+\newtheorem{definition}{Definition}
 
 \begin{document}
 
@@ -87,7 +88,7 @@ Notice that the $\mathbf{let\_old}$ expression can allocate objects; these remai
 $$\begin{array}{r l}
 \tau ::= & \mathsf{int}\ |\ \mathsf{bool}\ |\ C\\
 v ::= & z\ |\ o\ |\ \mathsf{null}\ |\ \mathsf{true}\ |\ \mathsf{false}\ |\ \{\overline{v}\}\\
-e ::= & v\ |\ x\ |\ \emptyset\ |\ e \op e\\
+e ::= & v\ |\ x\ |\ e \op e\\
 c ::= & e\ |\ \mathbf{new}\ C(\overline{e})\ |\ e.f\ |\ e.f := e\\
 | & e.m(\overline{e})\ |\ c : \tau\ |\ \mathbf{let}\ x = c\ \mathbf{in}\ c\\
 \mathit{spec} ::= & \mathbf{pre}\ c\ \mathbf{mutates}\ c\ \mathbf{let\_old}\ x = c\ \mathbf{post}\ c\\
@@ -165,5 +166,37 @@ v : \tau
 Apart from allocating additional (unreachable) objects, the FSC4J semantics matches the MicroJava semantics:
 if $(\emptyset, c) \Downarrow_\emptyset (h, v)$ then $\exists h' \subseteq h.\;(\emptyset, c) \Downarrow (h', v)$.
 \end{lemma}
+
+\begin{definition}
+We say a heap $h$ is \emph{well-typed} in the context of a given program $\mathit{prog}$, denoted $\mathit{prog} \vdash h\,\mathsf{wt}$, if each allocated object's class appears in the program and it has exactly the fields declared by the class and their values are of the declared types:
+$$\forall o \in \mathrm{dom},h.\;\exists C, \overline{\tau}, \overline{f}.\;o : C \land \mathbf{class}\ C\ \{\ \overline{\tau f}\ \cdots\ \} \land h(o) \in \{\{\overline{f\mapsto v}\}\ |\ \overline{v : \tau}\}$$
+\end{definition}
+
+\begin{definition}
+Given a program, we say a method $C.m$'s specification is \emph{well-defined} if the clauses always evaluate to a well-typed value:
+$$\begin{array}{l}
+\mathsf{spec\_well\_defined}(C.m) \triangleq\\
+\quad \forall h, \overline{v}.\;h\,\mathsf{wt} \land o : C \land o \in \mathrm{dom},h \land \overline{v : \tau} \land \{\overline{v}\} \cap \mathcal{O} \subseteq \mathrm{dom}\,h \Rightarrow\\
+\quad\quad \exists v_\mathsf{P}.\;(h, c_\mathsf{P}[o/\mathsf{this},\overline{v}/\overline{x}]) \Downarrow_{\mathrm{dom}\,h} (\_, v_\mathsf{P}) \land v_\mathsf{P} : \mathsf{bool} \land
+(v_\mathsf{P} = \mathsf{true} \Rightarrow\\
+\quad\quad\quad \exists O, h', v_\mathsf{L}.\;(h, c_\mathsf{M}[o/\mathsf{this},\overline{v}/\overline{x}]) \Downarrow_{\mathrm{dom}\,h} (\_, O) \land O \subseteq \mathrm{dom}\,h\; \land\\
+\quad\quad\quad\quad (h, c_\mathsf{L}[o/\mathsf{this},\overline{v}/\overline{x}]) \Downarrow_{\mathrm{dom}\,h} (h', v_\mathsf{L})\; \land\\
+\quad\quad\quad\quad \forall h'', v.\;h''\,\mathsf{wt} \land \mathrm{dom}\,h' \subseteq \mathrm{dom}\,h'' \land h'|_{\mathrm{dom}\,h'\setminus O} = h''|_{\mathrm{dom}\,h'\setminus O} \land v : \tau \land \{v\} \cap \mathcal{O} \subseteq \mathrm{dom}\,h'' \Rightarrow\\
+\quad\quad\quad\quad\quad \exists v_\mathsf{Q}.\;(h'', c_\mathsf{Q}[o/\mathsf{this}, \overline{v}/\overline{x}, v_\mathsf{L}/y, v/\mathsf{result}]) \Downarrow_{\mathrm{dom}\,h''} (\_, v_\mathsf{L}) \land v_\mathsf{L} : \mathsf{bool})\\
+\textrm{where $\mathbf{class}\ C\ \{\ \cdots\ \tau\ m(\overline{\tau\ x})\ \mathbf{pre}\ c_\mathsf{P}\ \mathbf{mutates}\ c_\mathsf{M}\ \mathbf{let\_old}\ y = c_\mathsf{L}\ \mathbf{post}\ c_\mathsf{Q}\ \{\ c\ \}$}
+\end{array}$$
+\end{definition}
+
+\begin{definition}
+Given a program, a method with a well-defined specification \emph{satisfies its specification} if, for any well-typed call of the method and well-typed pre-heap in which the precondition evaluates to $\mathsf{true}$, the body evaluates to a value and the postcondition evaluates to $\mathsf{true}$:
+$$\begin{array}{l}
+\mathsf{satisfies\_spec}(C.m) \triangleq\\
+\quad \forall h, o, \overline{v}.\;h\,\mathsf{wt} \land \{o, \overline{v}\} \cap \mathcal{O} \in \mathrm{dom}\,h \land \overline{v} : \overline{\tau} \land (h, c_\mathsf{P}[o/\mathsf{this},\overline{v}/\overline{x}]) \Downarrow_{\mathrm{dom}\,h} (\_, \mathsf{true}) \Rightarrow\\
+\quad \exists O, h', v_\mathsf{L}, h'', v.\;(h, c_\mathsf{M}[o/\mathsf{this},\overline{v}/\overline{x}]) \Downarrow_{\mathrm{dom}\,h} (\_, O) \land (h, c_\mathsf{L}[o/\mathsf{this},\overline{v}/\overline{x}]) \Downarrow_{\mathrm{dom}\,h} (\_, v_\mathsf{L})\;\land\\
+\quad\quad (h', c[o/\mathsf{this},\overline{v}/\overline{x}]) \Downarrow_{\mathrm{dom}\,h\setminus O} (h'', v) \land v : \tau\;\land\\
+\quad\quad (h'', c_\mathsf{Q}[o/\mathsf{this},\overline{v}/\overline{x}, v_\mathsf{L}/y, v/\mathsf{result}]) \Downarrow_{\mathsf{dom}\,h''} (\_, \mathsf{true})\\
+\textrm{where $\mathbf{class}\ C\ \{\ \cdots\ \tau\ m(\overline{\tau\ x})\ \mathbf{pre}\ c_\mathsf{P}\ \mathbf{mutates}\ c_\mathsf{M}\ \mathbf{let\_old}\ y = c_\mathsf{L}\ \mathbf{post}\ c_\mathsf{Q}\ \{\ c\ \}$}
+\end{array}$$
+\end{definition}
 
 \end{document}
