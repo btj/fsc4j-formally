@@ -9,6 +9,7 @@
 
 \newcommand{\op}{\odot}
 \newcommand{\hstep}{\rightarrow_\mathsf{h}}
+\newtheorem{lemma}{Lemma}
 
 \begin{document}
 
@@ -27,23 +28,22 @@ c ::= & e\ |\ \mathbf{new}\ C(\overline{e})\ |\ e.f\ |\ e.f := e\\
 \mathit{prog} ::= & \overline{\mathit{class}}\ c
 \end{array}$$
 
-$$K ::= \square\ |\ \mathbf{let}\ x = K\ \mathbf{in}\ c\ |\ K : \tau$$
-
 \begin{mathpar}
 \inferrule{
 o \notin \mathrm{dom}\,h\\
 o : C\\
 \overline{v} : \overline{\tau}\\
 \mathbf{class}\ C\ \{\ C(\overline{\tau\ x})\ \{\ c\ \}\ \cdots\ \}\\
+(h[o:=\{\overline{f \mapsto v_0^\tau}\}], c[o/\mathsf{this},\overline{v}/\overline{x}]) \Downarrow (h', \_)
 }{
-(h, \mathbf{new}\ C(\overline{v})) \hstep (h[o:=\{\overline{f \mapsto v_0^\tau}\}], c[o/\mathsf{this},\overline{v}/\overline{x}])
+(h, \mathbf{new}\ C(\overline{v})) \Downarrow (h', o)
 }
 \and
 \inferrule{
 o \in \mathrm{dom}\,h\\
 f \in \mathrm{dom}\,h(o)
 }{
-(h, o.f) \hstep (h, h(o)(f))
+(h, o.f) \Downarrow (h, h(o)(f))
 }
 \and
 \inferrule{
@@ -51,30 +51,119 @@ o \in \mathrm{dom}\,h\\
 o : C\\
 v : C.f
 }{
-(h, o.f := v) \hstep (h[o:=h(o)[f:=v]])
+(h, o.f := v) \Downarrow (h[o:=h(o)[f:=v]], v)
 }
 \and
 \inferrule{
 o \in \mathrm{dom}\,h\\
 o : C\\
-\mathbf{class}\ C\ \{\ \cdots\ \tau\ m(\overline{\tau\ x})\ \{\ c\ \}\ \cdots\ \}
+\mathbf{class}\ C\ \{\ \cdots\ \tau\ m(\overline{\tau\ x})\ \{\ c\ \}\ \cdots\ \}\\
+(h, c[o/\mathsf{this}, \overline{v}/\overline{x}] : \tau) \Downarrow (h', v)
 }{
-(h, o.m(\overline{v})) \hstep (h, c[o/\mathsf{this}, \overline{v}/\overline{x}] : \tau)
+(h, o.m(\overline{v})) \Downarrow (h', v)
 }
 \and
-(h, \mathbf{let}\ x = v\ \mathbf{in}\ c) \hstep (h, c[v/x])
+\inferrule{
+(h, c) \Downarrow (h', v)\\
+(h', c'[v/x]) \Downarrow (h'', v')
+}{
+(h, \mathbf{let}\ x = c\ \mathbf{in}\ c') \Downarrow (h'', v')
+}
 \and
 \inferrule{
+(h, c) \Downarrow (h', v)\\
 v : \tau
 }{
-(h, v : \tau) \hstep (h, v)
+(h, c : \tau) \Downarrow (h', v)
+}
+\end{mathpar}
+
+\section{Preconditions, postconditions, mutates, old}
+
+We make the following simplifications with respect to real FSC4J: exactly one precondition, exactly one $\mathbf{mutates}$ clause which evaluates to a set of object references, exactly one postcondition, $\mathbf{old}$ expressions are desugared to a $\mathbf{let\_old}$ clause that binds a value computed in the pre-state to a variable available in the postcondition.
+
+Notice that the $\mathbf{let\_old}$ expression can allocate objects; these remain in subsequent heaps, but outside of the postcondition they are not reachable. Notice also that there is exactly one $\mathbf{let\_old}$ expression; if multiple $\mathbf{old}$ expressions appear in the postcondition, they can be tupled up into a single object.
+
+$$\begin{array}{r l}
+\tau ::= & \mathsf{int}\ |\ \mathsf{bool}\ |\ C\\
+v ::= & z\ |\ o\ |\ \mathsf{null}\ |\ \mathsf{true}\ |\ \mathsf{false}\ |\ \{\overline{v}\}\\
+e ::= & v\ |\ x\ |\ \emptyset\ |\ e \op e\\
+c ::= & e\ |\ \mathbf{new}\ C(\overline{e})\ |\ e.f\ |\ e.f := e\\
+| & e.m(\overline{e})\ |\ c : \tau\ |\ \mathbf{let}\ x = c\ \mathbf{in}\ c\\
+\mathit{spec} ::= & \mathbf{pre}\ c\ \mathbf{mutates}\ c\ \mathbf{let\_old}\ x = c\ \mathbf{post}\ c\\
+\mathit{meth} ::= & \tau\ m(\overline{\tau\ x})\ \mathit{spec}\ \{\ c\ \}\\
+\mathit{class} ::= & \mathbf{class}\ C\ \{\ \overline{\tau\ f}\ C(\overline{\tau\ x})\ \mathit{spec}\ \{\ c\ \}\ \overline{\mathit{meth}}\ \}\\
+\mathit{prog} ::= & \overline{\mathit{class}}\ c
+\end{array}$$
+
+We instrument the semantics with a set $F$ of \emph{frozen objects}.
+
+\begin{mathpar}
+\inferrule{
+o \notin \mathrm{dom}\,h\\
+o : C\\
+\overline{v} : \overline{\tau}\\
+\mathbf{class}\ C\ \{\ C(\overline{\tau\ x})\ \mathbf{pre}\ c_\mathsf{P}\ \mathbf{mutates}\ c_\mathsf{M}\ \mathbf{let\_old}\ y = c_\mathsf{L}\ \mathbf{post}\ c_\mathsf{Q}\ \{\ c\ \}\ \cdots\ \}\\
+(h, c_\mathsf{P}[\overline{v}/\overline{x}]) \Downarrow_{\mathrm{dom}\,h} (\_, \mathsf{true})\\
+(h, c_\mathsf{M}[\overline{v}/\overline{x}]) \Downarrow_{\mathrm{dom}\,h} (\_, O)\\
+O \subseteq \mathrm{dom}\,h\\
+O \cap F = \emptyset\\
+(h, c_\mathsf{L}[\overline{v}/\overline{x}]) \Downarrow_{\mathrm{dom}\,h} (h', v_\mathsf{L})\\
+(h'[o:=\{\overline{f \mapsto v_0^\tau}\}], c[o/\mathsf{this},\overline{v}/\overline{x}]) \Downarrow_{\mathrm{dom}\,h' \setminus O \setminus \{o\}} (h'', \_)\\
+(h'', c_\mathsf{Q}[o/\mathsf{this}, \overline{v}/\overline{x}, v_\mathsf{L}/y]) \Downarrow_{\mathrm{dom}\,h''} (\_, \mathsf{true})
+}{
+(h, \mathbf{new}\ C(\overline{v})) \Downarrow_F (h'', o)
 }
 \and
 \inferrule{
-(h, c) \hstep (h, c')
+o \in \mathrm{dom}\,h\\
+f \in \mathrm{dom}\,h(o)
 }{
-(h, K[c]) \rightarrow (h, K[c'])
+(h, o.f) \Downarrow_F (h, h(o)(f))
+}
+\and
+\inferrule{
+o \in \mathrm{dom}\,h\\
+o : C\\
+v : C.f\\
+o \notin F\\
+}{
+(h, o.f := v) \Downarrow_F (h[o:=h(o)[f:=v]], v)
+}
+\and
+\inferrule{
+o \in \mathrm{dom}\,h\\
+o : C\\
+\mathbf{class}\ C\ \{\ \cdots\ \tau\ m(\overline{\tau\ x})\ \mathbf{pre}\ c_\mathsf{P}\ \mathbf{mutates}\ c_\mathsf{M}\ \mathbf{let\_old}\ y = c_\mathsf{L}\ \mathbf{post}\ c_\mathsf{Q}\ \{\ c\ \}\ \cdots\ \}\\
+(h, c_\mathsf{P}[o/\mathsf{this}, \overline{v}/\overline{x}]) \Downarrow_{\mathrm{dom}\,h} (\_, \mathsf{true})\\
+(h, c_\mathsf{M}[o/\mathsf{this}, \overline{v}/\overline{x}]) \Downarrow_{\mathrm{dom}\,h} (\_, O)\\
+O \subseteq \mathrm{dom}\,h\\
+O \cap F = \emptyset\\
+(h, c_\mathsf{L}[o/\mathsf{this}, \overline{v}/\overline{x}]) \Downarrow_{\mathrm{dom}\,h} (h', v_\mathsf{L})\\
+(h', c[o/\mathsf{this}, \overline{v}/\overline{x}] : \tau) \Downarrow_{\mathrm{dom}\,h' \setminus O} (h'', v)\\
+(h'', c_\mathsf{Q}[o/\mathsf{this}, \overline{v}/\overline{x}, v_\mathsf{L}/y, v/\mathsf{result}]) \Downarrow_{\mathrm{dom}\,h''} (\_, \mathsf{true})
+}{
+(h, o.m(\overline{v})) \Downarrow_F (h'', v)
+}
+\and
+\inferrule{
+(h, c) \Downarrow_F (h', v)\\
+(h', c'[v/x]) \Downarrow_F (h'', v')
+}{
+(h, \mathbf{let}\ x = c\ \mathbf{in}\ c') \Downarrow_F (h'', v')
+}
+\and
+\inferrule{
+(h, c) \Downarrow_F (h', v)\\
+v : \tau
+}{
+(h, c : \tau) \Downarrow_F (h', v)
 }
 \end{mathpar}
+
+\begin{lemma}
+Apart from allocating additional (unreachable) objects, the FSC4J semantics matches the MicroJava semantics:
+if $(\emptyset, c) \Downarrow_\emptyset (h, v)$ then $\exists h' \subseteq h.\;(\emptyset, c) \Downarrow (h', v)$.
+\end{lemma}
 
 \end{document}
