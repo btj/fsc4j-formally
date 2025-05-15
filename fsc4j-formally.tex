@@ -199,4 +199,25 @@ $$\begin{array}{l}
 \end{array}$$
 \end{definition}
 
+\section{Data abstraction}
+
+The system from the previous section suffices for basic procedural abstraction, but does not support data abstraction. In particular, for effective data abstraction, it must be possible for clients to tell whether a mutation affects an inspector's value without needing to look at the inspector's implementation. To support this, we extend the system so that it tracks the set of objects that were read during the evaluation of a command and makes this set available in a method's postcondition under the name $\mathsf{readSet}$. 
+
+Furthermore, to support checking abstract state invariants without introducing infinite recursion, we make the caller's frozen set available to a callee's precondition under the name $\mathsf{frozenSet}$. This allows the callee to determine whether a caller possibly mutated an object and hence possibly broke its invariants. This enables avoiding that inspector calls performed by inspectors cause the recursive checking of abstract state invariants.
+
+These ingredients are sufficient to encode representation objects, representation invariants, and abstract state invariants. The pattern is as follows:
+\begin{itemize}
+\item Each class defines a method $\mathsf{repSet}()$ that returns the set of objects it uses for an instance $o$'s representation. In FSC4J, this corresponds to $o$ itself plus the union of the rep sets of $o$'s representation objects. Method $\mathsf{repSet}$ should have a postcondition asserting that its result value be a subset of its read set. In other words, to compute its rep set, an object must inspect only objects that are in its rep set. (In the literature, such an inspector is called \emph{self-framing}.)
+\item Each class defines a method $\mathsf{repInv}()$ that returns a boolean indicating whether an instance's representation invariants hold. This method shall have a postcondition asserting that the read set is included in $o$'s rep set. That is, an object's validity must depend only on the state of the objects in its rep set.
+\item Each class defines a method $\mathsf{absInv}()$ that returns a boolean indicating whether an instance's abstract state invariants hold. (We say a class has an \emph{invalid representation} if its representation invariant does not imply its abstract state invariant.)
+\item Each method that requires that an object $o$ be valid shall require $o.\mathsf{repInv}()$, as well as, if $o$ is not in $\mathsf{frozenSet}$, $o.\mathsf{absInv}()$.
+\item Each inspector's postcondition shall assert that its read set be included in the union of the rep sets of the objects inspected by the inspector.
+\end{itemize}
+
+A constructor or factory method's postcondition typically needs to express that the newly created object's rep set is included in the set of objects that were allocated during the evaluation of the constructor or method. To support this, we make the set of objects allocated by a method available to the method's postcondition under the name $\mathsf{newSet}$.
+
+\section{Immutable objects}
+
+To facilitate reasoning about immutable objects, we extend the system to support \emph{permanently freezing} an object, as well as determining whether an object has been permanently frozen. Reading a permanently frozen object does not add the object to the read set. An immutable class' inspectors' postconditions shall specify that their read sets are empty.
+
 \end{document}
