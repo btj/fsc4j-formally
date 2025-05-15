@@ -299,7 +299,7 @@ $$\begin{array}{l}
 \\
 \quad \mathsf{NonnegCell}(\mathsf{int}\ \mathsf{value})\\
 \quad\quad \mathbf{pre}\ 0 \le \mathsf{value}\\
-\quad\quad \mathbf{post}\ \mathsf{this}.\mathsf{getValue}() = \mathsf{value} \land \mathsf{this}.\mathsf{repSet}() \subseteq \mathsf{newSet}\\
+\quad\quad \mathbf{post}\ \mathsf{this}.\mathsf{repInv}() \land \mathsf{this}.\mathsf{absInv}() \land \mathsf{this}.\mathsf{getValue}() = \mathsf{value} \land \mathsf{this}.\mathsf{repSet}() \subseteq \mathsf{newSet}\\
 \quad \{\ \mathsf{this}.\mathsf{value} := \mathsf{value}\ \}\\
 \\
 \quad \mathsf{void}\ \mathsf{decrement}()\\
@@ -334,7 +334,7 @@ $$\begin{array}{l}
 \\
 \quad \mathsf{PosCell}(\mathsf{int}\ \mathsf{value})\\
 \quad\quad \mathbf{pre}\ 1 \le \mathsf{value}\\
-\quad\quad \mathbf{post}\ \mathsf{this}.\mathsf{getValue}() = \mathsf{value} \land \mathsf{this}.\mathsf{repSet}() \subseteq \mathsf{newSet}\\
+\quad\quad \mathbf{post}\ \mathsf{this}.\mathsf{repInv}() \land \mathsf{this}.\mathsf{absInv}() \land \mathsf{this}.\mathsf{getValue}() = \mathsf{value} \land \mathsf{this}.\mathsf{repSet}() \subseteq \mathsf{newSet}\\
 \quad \{\ \mathsf{this}.\mathsf{inner} := \mathbf{new}\ \mathsf{NonnegCell}(\mathsf{value})\ \}\\
 \\
 \quad \mathsf{void}\ \mathsf{decrement}()\\
@@ -349,5 +349,64 @@ $$\begin{array}{l}
 \section{Immutable objects}
 
 To facilitate reasoning about immutable objects, we extend the system to support \emph{permanently freezing} an object, as well as determining whether an object has been permanently frozen. Reading a permanently frozen object does not add the object to the read set. An immutable class' inspectors' postconditions shall specify that their read sets are empty.
+
+\begin{verbatim}
+/**
+ * @immutable
+ * @invar | 0 <= length()
+ */
+public class String {
+    private int firstChar;
+    private String remainingChars;
+    
+    public int length() {
+        return remainingChars == null ? 0 : 1 + remainingChars.length();
+    }
+    
+    /**
+     * @post | length() ==
+     *.      | (remainingChars == null ? 0 : 1 + remainingChars.length())
+     */
+    public String(int firstChars, String remainingChars) {
+        this.firstChar = firstChar;
+        this.remainingChars = remainingChars;
+    }
+}
+\end{verbatim}
+
+$$\begin{array}{l}
+\mathbf{class}\ \mathsf{String}\ \{\\
+\quad \mathsf{int}\ \mathsf{firstChar};\\
+\quad \mathsf{String}\ \mathsf{remainingChars};\\
+\\
+\quad \mathsf{set}\ \mathsf{repSet}()\\
+\quad\quad \mathbf{post}\ \mathsf{result} = \emptyset\\
+\quad \{\ \emptyset\ \}\\
+\\
+\quad \mathsf{bool}\ \mathsf{repInv}()\\
+\quad\quad \mathbf{post}\ \mathsf{readSet} = \emptyset\\
+\quad \{\ \mathbf{isPermFrozen}(\mathsf{this}) \land (\mathsf{this}.\mathsf{remainingChars} = \mathsf{null} \lor \mathsf{this}.\mathsf{remainingChars}.\mathsf{repInv}())\ \}\\
+\\
+\quad \mathsf{bool}\ \mathsf{absInv}()\\
+\quad\quad \mathbf{post}\ \mathsf{true}\\
+\quad \{\ 0 \le \mathsf{this}.\mathsf{length}() \}\\
+\\
+\quad \mathsf{int}\ \mathsf{length}()\\
+\quad\quad \mathbf{pre}\ \mathsf{this}.\mathsf{repInv}()\\
+\quad\quad \mathbf{post}\ \mathsf{readSet} \subseteq \mathsf{this}.\mathsf{repSet}()\\
+\quad \{\ \mathbf{if}\ \mathsf{this}.\mathsf{remainingChars} = \mathsf{null}\ \mathbf{then}\ 0\ \mathbf{else}\ 1 + \mathsf{this}.\mathsf{remainingChars}.\mathsf{length}()\ \}\\
+\\
+\quad \mathsf{String}(\mathsf{int}\ \mathsf{firstChar}, \mathsf{String}\ \mathsf{remainingChars})\\
+\quad\quad \mathbf{pre}\ \mathsf{remainingChars} = \mathsf{null} \lor \mathsf{remainingChars}.\mathsf{repInv}()\\
+\quad\quad \mathbf{post}\\
+\quad\quad\quad \mathsf{this}.\mathsf{repInv}() \land \mathsf{this}.\mathsf{absInv}()\; \land\\
+\quad\quad\quad \mathsf{this}.\mathsf{length}() = (\mathbf{if}\ \mathsf{remainingChars} = \mathsf{null}\ \mathbf{then}\ 0\ \mathbf{else}\ 1 + \mathsf{remainingChars}.\mathsf{length}())\\
+\quad \{\\
+\quad\quad \mathsf{this}.\mathsf{firstChar} := \mathsf{firstChar};\\
+\quad\quad \mathsf{this}.\mathsf{remainingChars} := \mathsf{remainingChars};\\
+\quad\quad \mathbf{freezePermanently}(\mathsf{this});\\
+\quad \}\\
+\}
+\end{array}$$
 
 \end{document}
