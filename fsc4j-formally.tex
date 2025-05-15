@@ -1,0 +1,80 @@
+\documentclass{article}
+
+\usepackage{amssymb}
+\usepackage{mathpartir}
+
+\title{FSC4J, Formally}
+
+\author{Bart Jacobs}
+
+\newcommand{\op}{\odot}
+\newcommand{\hstep}{\rightarrow_\mathsf{h}}
+
+\begin{document}
+
+\maketitle
+
+\section{MicroJava}
+
+$$\begin{array}{r l}
+\tau ::= & \mathsf{int}\ |\ \mathsf{bool}\ |\ C\\
+v ::= & z\ |\ o\ |\ \mathsf{null}\ |\ \mathsf{true}\ |\ \mathsf{false}\\
+e ::= & v\ |\ x\ |\ e \op e\\
+c ::= & e\ |\ \mathbf{new}\ C(\overline{e})\ |\ e.f\ |\ e.f := e\\
+| & e.m(\overline{e})\ |\ c : \tau\ |\ \mathbf{let}\ x = c\ \mathbf{in}\ c\\
+\mathit{meth} ::= & \tau\ m(\overline{\tau\ x})\ \{\ c\ \}\\
+\mathit{class} ::= & \mathbf{class}\ C\ \{\ \overline{\tau\ f}\ C(\overline{\tau\ x})\ \{\ c\ \}\ \overline{\mathit{meth}}\ \}\\
+\mathit{prog} ::= & \overline{\mathit{class}}\ c
+\end{array}$$
+
+$$K ::= \square\ |\ \mathbf{let}\ x = K\ \mathbf{in}\ c\ |\ K : \tau$$
+
+\begin{mathpar}
+\inferrule{
+o \notin \mathrm{dom}\,h\\
+o : C\\
+\overline{v} : \overline{\tau}\\
+\mathbf{class}\ C\ \{\ C(\overline{\tau\ x})\ \{\ c\ \}\ \cdots\ \}\\
+}{
+(h, \mathbf{new}\ C(\overline{v})) \hstep (h[o:=\{\overline{f \mapsto v_0^\tau}\}], c[o/\mathsf{this},\overline{v}/\overline{x}])
+}
+\and
+\inferrule{
+o \in \mathrm{dom}\,h\\
+f \in \mathrm{dom}\,h(o)
+}{
+(h, o.f) \hstep (h, h(o)(f))
+}
+\and
+\inferrule{
+o \in \mathrm{dom}\,h\\
+o : C\\
+v : C.f
+}{
+(h, o.f := v) \hstep (h[o:=h(o)[f:=v]])
+}
+\and
+\inferrule{
+o \in \mathrm{dom}\,h\\
+o : C\\
+\mathbf{class}\ C\ \{\ \cdots\ \tau\ m(\overline{\tau\ x})\ \{\ c\ \}\ \cdots\ \}
+}{
+(h, o.m(\overline{v})) \hstep (h, c[o/\mathsf{this}, \overline{v}/\overline{x}] : \tau)
+}
+\and
+(h, \mathbf{let}\ x = v\ \mathbf{in}\ c) \hstep (h, c[v/x])
+\and
+\inferrule{
+v : \tau
+}{
+(h, v : \tau) \hstep (h, v)
+}
+\and
+\inferrule{
+(h, c) \hstep (h, c')
+}{
+(h, K[c]) \rightarrow (h, K[c'])
+}
+\end{mathpar}
+
+\end{document}
