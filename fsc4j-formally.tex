@@ -350,24 +350,31 @@ $$\begin{array}{l}
 
 To facilitate reasoning about immutable objects, we extend the system to support \emph{permanently freezing} an object, as well as determining whether an object has been permanently frozen. Reading a permanently frozen object does not add the object to the read set. An immutable class' inspectors' postconditions shall specify that their read sets are empty.
 
+For simplicity, we impose the rule that $\mathsf{this}$ may appear in an immutable class' constructor only as part of a $\mathsf{this}.f$ or $\mathsf{this}.f := e$ or $\mathbf{freezePermanently}(\mathsf{this})$ command. Furthermore, the constructor's postcondition must assert $\mathsf{this}.\mathsf{repInv}()$. It follows that the constructor does not leak the object into existing objects' fields and the object becomes available to the outside world only when frozen and valid. It follows that, except for $\mathsf{this}$ in an immutable class' constructor, we can derive simply from an object's type that it is valid and frozen.
+
 \begin{verbatim}
 /**
  * @immutable
+ * @invar | 0 <= getFirstChar() && getFirstChar() <= 0x1fffff
  * @invar | 0 <= length()
  */
 public class String {
     private int firstChar;
     private String remainingChars;
     
+    public int getFirstChar() { return firstChar; }
+    
     public int length() {
         return remainingChars == null ? 0 : 1 + remainingChars.length();
     }
     
     /**
+     * @pre | 0 <= firstChar && firstChar <= 0x1fffff
+     * @post | getFirstChar() == firstChar
      * @post | length() ==
      *.      | (remainingChars == null ? 0 : 1 + remainingChars.length())
      */
-    public String(int firstChars, String remainingChars) {
+    public String(int firstChar, String remainingChars) {
         this.firstChar = firstChar;
         this.remainingChars = remainingChars;
     }
@@ -385,26 +392,32 @@ $$\begin{array}{l}
 \\
 \quad \mathsf{bool}\ \mathsf{repInv}()\\
 \quad\quad \mathbf{post}\ \mathsf{readSet} = \emptyset\\
-\quad \{\ \mathbf{isPermFrozen}(\mathsf{this}) \land (\mathsf{this}.\mathsf{remainingChars} = \mathsf{null} \lor \mathsf{this}.\mathsf{remainingChars}.\mathsf{repInv}())\ \}\\
+\quad \{\ 0 \le \mathsf{this}.\mathsf{firstChar} \le \mathsf{0x1fffff}\ \}\\
 \\
 \quad \mathsf{bool}\ \mathsf{absInv}()\\
 \quad\quad \mathbf{post}\ \mathsf{true}\\
-\quad \{\ 0 \le \mathsf{this}.\mathsf{length}() \}\\
+\quad \{\ 0 \le \mathsf{this}.\mathsf{getFirstChar}() \le \mathsf{0x1fffff} \land 0 \le \mathsf{this}.\mathsf{length}() \}\\
+\\
+\quad \mathsf{int}\ \mathsf{getFirstChar}()\\
+\quad\quad \mathbf{pre}\ \mathsf{true}\\
+\quad\quad \mathbf{post}\ \mathsf{readSet} \subseteq \mathsf{this}.\mathsf{repSet}()\\
+\quad \{\ \mathsf{this}.\mathsf{firstChar}\ \}\\
 \\
 \quad \mathsf{int}\ \mathsf{length}()\\
-\quad\quad \mathbf{pre}\ \mathsf{this}.\mathsf{repInv}()\\
+\quad\quad \mathbf{pre}\ \mathsf{true}\\
 \quad\quad \mathbf{post}\ \mathsf{readSet} \subseteq \mathsf{this}.\mathsf{repSet}()\\
 \quad \{\ \mathbf{if}\ \mathsf{this}.\mathsf{remainingChars} = \mathsf{null}\ \mathbf{then}\ 0\ \mathbf{else}\ 1 + \mathsf{this}.\mathsf{remainingChars}.\mathsf{length}()\ \}\\
 \\
 \quad \mathsf{String}(\mathsf{int}\ \mathsf{firstChar}, \mathsf{String}\ \mathsf{remainingChars})\\
-\quad\quad \mathbf{pre}\ \mathsf{remainingChars} = \mathsf{null} \lor \mathsf{remainingChars}.\mathsf{repInv}()\\
+\quad\quad \mathbf{pre}\ 0 \le \mathsf{firstChar} \le \mathsf{0x1fffff}\\
 \quad\quad \mathbf{post}\\
 \quad\quad\quad \mathsf{this}.\mathsf{repInv}() \land \mathsf{this}.\mathsf{absInv}()\; \land\\
+\quad\quad\quad \mathsf{this}.\mathsf{getFirstChar}() = \mathsf{firstChar}\; \land\\
 \quad\quad\quad \mathsf{this}.\mathsf{length}() = (\mathbf{if}\ \mathsf{remainingChars} = \mathsf{null}\ \mathbf{then}\ 0\ \mathbf{else}\ 1 + \mathsf{remainingChars}.\mathsf{length}())\\
 \quad \{\\
 \quad\quad \mathsf{this}.\mathsf{firstChar} := \mathsf{firstChar};\\
 \quad\quad \mathsf{this}.\mathsf{remainingChars} := \mathsf{remainingChars};\\
-\quad\quad \mathbf{freezePermanently}(\mathsf{this});\\
+\quad\quad \mathbf{freezePermanently}(\mathsf{this})\\
 \quad \}\\
 \}
 \end{array}$$
